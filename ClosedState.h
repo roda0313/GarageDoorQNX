@@ -12,7 +12,7 @@
 
 namespace Controller {
 
-class ClosedState: public State {
+class ClosedState : public State {
 public:
 	ClosedState();
 	virtual ~ClosedState();

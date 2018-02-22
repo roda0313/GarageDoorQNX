@@ -1,7 +1,7 @@
 
 namespace Controller {
 	enum Events {
-		PUSH_BUTTON,
+		PUSH_BUTTON = 0,
 		IR_TRIP,
 		OVERCURRENT,
 		DOOR_OPENED,
@@ -10,5 +10,4 @@ namespace Controller {
 		MOTOR_FORWARD,
 		MOTOR_REVERSE
 	};
-
 }

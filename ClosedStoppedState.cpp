@@ -1,30 +1,28 @@
 /*
- * ClosedState.cpp
+ * ClosedStoppedState.cpp
  *
- *  Created on: Feb 20, 2018
+ *  Created on: Feb 22, 2018
  *      Author: Daniel
  */
 
-#include "ClosedState.h"
-#include "OpeningState.h";
-#include <iostream>
+#include "ClosedStoppedState.h"
 
 namespace Controller {
 
-ClosedState::ClosedState() {
+ClosedStoppedState::ClosedStoppedState() {
 	// TODO Auto-generated constructor stub
 
 }
 
-ClosedState::~ClosedState() {
+ClosedStoppedState::~ClosedStoppedState() {
 	// TODO Auto-generated destructor stub
 }
 
-void ClosedState::HandleEvent(Machine *m, Events e){
+void ClosedStoppedState::HandleEvent(Machine *m, Events e){
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
 		std::cout << "Got push button event, moving to opening state" << std::endl;
-		m->SetState(new OpeningState());
+		// m->SetState(new OpeningState());
 		delete this;
 	}
 	else {
