@@ -13,8 +13,7 @@
 namespace Controller {
 
 ClosingState::ClosingState() {
-	// TODO Auto-generated constructor stub
-
+	std::cout << "Creating ClosingState object" << std::endl;
 }
 
 ClosingState::~ClosingState() {
@@ -43,7 +42,8 @@ void ClosingState::HandleEvent(Machine *m, Events e){
 		m->SetState(new OpeningState());
 	}
 	else {
-		std::cout << "Unhandled event " << e << " in state " << typeid(this).name() << std::endl;
+		std::cout << "Unhandled event " << e << " in state ClosingState" << std::endl;
+		return; // dont destroy object, stay in state
 	}
 
 	delete this;

@@ -7,12 +7,12 @@
 
 #include "OpenStoppedState.h"
 #include "ClosedState.h"
+#include "ClosingState.h"
 
 namespace Controller {
 
 OpenStoppedState::OpenStoppedState() {
-	// TODO Auto-generated constructor stub
-
+	std::cout << "Creating OpenStoppedState object" << std::endl;
 }
 
 OpenStoppedState::~OpenStoppedState() {
@@ -22,11 +22,12 @@ OpenStoppedState::~OpenStoppedState() {
 void OpenStoppedState::HandleEvent(Machine *m, Events e) {
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
-		std::cout << "Got push button event, moving to Closed state" << std::endl;
-		m->SetState(new ClosedState());
+		std::cout << "Got push button event, moving to Closing state" << std::endl;
+		m->SetState(new ClosingState());
 	}
 	else {
-		std::cout << "Unhandled event " << e << " in state " << typeid(this).name() << std::endl;
+		std::cout << "Unhandled event " << e << " in state OpenStoppedState" << std::endl;
+		return; // dont destroy object, stay in state
 	}
 
 	delete this;

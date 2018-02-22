@@ -33,7 +33,7 @@ class State
   public:
     virtual void HandleEvent(Machine *m, Events e)
     {
-        std::cout << "   default HandleEvent\n";
+        std::cout << "   default HandleEvent\n" << std::endl;
     }
 };
 }

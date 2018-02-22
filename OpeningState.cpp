@@ -12,8 +12,7 @@
 namespace Controller {
 
 OpeningState::OpeningState() {
-	// TODO Auto-generated constructor stub
-
+	std::cout << "Creating OpeningState object" << std::endl;
 }
 
 OpeningState::~OpeningState() {
@@ -23,7 +22,7 @@ OpeningState::~OpeningState() {
 void OpeningState::HandleEvent(Machine *m, Events e){
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
-		std::cout << "Got push button event, moving to OpeningStopped state" << std::endl;
+		std::cout << "Got push button event, moving to OpenStopped state" << std::endl;
 		m->SetState(new OpenStoppedState());
 	}
 	else if(e == DOOR_OPENED) {
@@ -37,7 +36,8 @@ void OpeningState::HandleEvent(Machine *m, Events e){
 		m->SetState(new OpenStoppedState());
 	}
 	else {
-		std::cout << "Unhandled event " << e << " in state " << typeid(this).name() << std::endl;
+		std::cout << "Unhandled event " << e << " in state OpeningState" << std::endl;
+		return; // dont destroy object, stay in state
 	}
 
 	delete this;
