@@ -6,6 +6,9 @@
  */
 
 #include "ClosingState.h"
+#include "ClosedStoppedState.h"
+#include "ClosedState.h"
+#include "OpeningState.h"
 
 namespace Controller {
 
@@ -21,13 +24,29 @@ ClosingState::~ClosingState() {
 void ClosingState::HandleEvent(Machine *m, Events e){
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
-		std::cout << "Got push button event, moving to opening state" << std::endl;
-		// m->SetState(new OpeningState());
-		delete this;
+		std::cout << "Got push button event, moving to ClosedStoppedState state" << std::endl;
+		m->SetState(new ClosedStoppedState());
+	}
+	else if(e == DOOR_CLOSED) {
+		// handle the event then change state
+		std::cout << "Got door closed event, moving to Closed state" << std::endl;
+		m->SetState(new ClosedState());
+	}
+	else if(e == IR_TRIP) {
+		// handle the event then change state
+		std::cout << "Got IR Trip event, moving to Opening state" << std::endl;
+		m->SetState(new OpeningState());
+	}
+	else if(e == OVERCURRENT) {
+		// handle the event then change state
+		std::cout << "Got over current event, moving to Opening state" << std::endl;
+		m->SetState(new OpeningState());
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state " << typeid(this).name() << std::endl;
 	}
+
+	delete this;
 }
 
 }

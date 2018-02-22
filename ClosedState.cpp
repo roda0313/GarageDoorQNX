@@ -25,11 +25,12 @@ void ClosedState::HandleEvent(Machine *m, Events e){
 		// handle the event then change state
 		std::cout << "Got push button event, moving to opening state" << std::endl;
 		m->SetState(new OpeningState());
-		delete this;
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state " << typeid(this).name() << std::endl;
 	}
+
+	delete this;
 }
 
 }

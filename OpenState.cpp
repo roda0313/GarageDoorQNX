@@ -6,6 +6,7 @@
  */
 
 #include "OpenState.h"
+#include "ClosingState.h"
 
 namespace Controller {
 
@@ -21,12 +22,14 @@ OpenState::~OpenState() {
 void OpenState::HandleEvent(Machine *m, Events e) {
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
-		// m->SetState(new OpeningState());
-		delete this;
+		std::cout << "Got push button event, moving to Closing state" << std::endl;
+		m->SetState(new ClosingState());
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state " << typeid(this).name() << std::endl;
 	}
+
+	delete this;
 }
 
 }

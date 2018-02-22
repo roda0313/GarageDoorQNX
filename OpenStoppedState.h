@@ -12,7 +12,7 @@
 
 namespace Controller {
 
-class OpenStoppedState {
+class OpenStoppedState : public State{
 public:
 	OpenStoppedState();
 	virtual ~OpenStoppedState();
