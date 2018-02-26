@@ -23,6 +23,7 @@ void OpenState::HandleEvent(Machine *m, Events e) {
 		// handle the event then change state
 		std::cout << "Got push button event, moving to Closing state" << std::endl;
 		m->SetState(new ClosingState());
+		m->SendEvent(START_CLOSE_TIMER);
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state OpenState" << std::endl;

@@ -17,7 +17,7 @@ class Machine
 {
   class State *current;
   public:
-    Machine();
+    Machine(int chid);
     ~Machine();
 
     void SetState(State *s)
@@ -26,6 +26,10 @@ class Machine
     }
 
     void HandleEvent(Events);
+    void SendEvent(Events);
+
+  private:
+    int m_chid;
 };
 
 class State
