@@ -35,7 +35,8 @@ void Machine::HandleEvent(Events e) {
 
 void Machine::SendEvent(char e) {
 
-	std::cout << "Attempting to send event from Machine: " << e << std::endl;
+	if(DEBUG_MODE)
+		std::cout << "Attempting to send event from Machine: " << e << std::endl;
 
 	char rmsg[200];
 	if(MsgSend(m_coid, &e, strlen(&e) + 1, rmsg, sizeof(rmsg)) == -1) {

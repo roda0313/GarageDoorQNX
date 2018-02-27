@@ -6,6 +6,8 @@
 #include <string>
 
 namespace Controller {
+	const bool DEBUG_MODE = false;
+
 	enum Events {
 		PUSH_BUTTON = 0,
 		IR_TRIP,

@@ -14,7 +14,7 @@ namespace Controller {
 
 class OpeningState : public State {
 public:
-	OpeningState();
+	OpeningState(Machine *m);
 	virtual ~OpeningState();
 
 	void HandleEvent(Machine *m, Events e);

@@ -8,6 +8,8 @@
 
 #include "Machine.h"
 
+const bool DEBUG_MODE = Controller::DEBUG_MODE;
+
 struct Channels {
 	int inputScannerChid;
 	int controllerChid;
@@ -44,7 +46,8 @@ Controller::Events CharToEvent(char input) {
 }
 
 void *RunDoorOpeningTimerThread(void* args) {
-	std::cout << "RunDoorOpeningTimerThread started..." << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "RunDoorOpeningTimerThread started..." << std::endl;
 
 	int chid = (int)args;
 	int coid;
@@ -71,7 +74,8 @@ void *RunDoorOpeningTimerThread(void* args) {
 }
 
 void *RunDoorClosingTimerThread(void* args) {
-	std::cout << "RunDoorClosingTimerThread started..." << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "RunDoorClosingTimerThread started..." << std::endl;
 
 	int chid = (int)args;
 	int coid;
@@ -97,7 +101,8 @@ void *RunDoorClosingTimerThread(void* args) {
 }
 
 void *RunKeyboardScannerThread(void* args){
-	std::cout << "Keyboard Scanner running..." << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "Keyboard Scanner running..." << std::endl;
 
 	Channels* chids = (Channels*)args;
 	int chid = chids->inputScannerChid;
@@ -116,7 +121,8 @@ void *RunKeyboardScannerThread(void* args){
 	while(1)
 	{
 		std::cin >> inp;
-		std::cout << "GOT " << inp << std::endl;
+		if (DEBUG_MODE)
+			std::cout << "GOT " << inp << std::endl;
 
 		switch(inp)
 		{
@@ -157,8 +163,8 @@ void *RunKeyboardScannerThread(void* args){
 }
 
 void *RunInputScaner(void* args) {
-
-	std::cout << "Input Scanner running..." << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "Input Scanner running..." << std::endl;
 
 	Channels* chids = (Channels*)args;
 	int sendChid = chids->controllerChid;
@@ -179,7 +185,8 @@ void *RunInputScaner(void* args) {
 	while(1){
 		// check for message
 		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
-		std::cout << "GOT message in input scanner " << message << std::endl;
+		if (DEBUG_MODE)
+			std::cout << "GOT message in input scanner " << message << std::endl;
 
 		// send a response to wherever the message originally came from
 		std::string response =  "Sending response";
@@ -207,16 +214,19 @@ void *RunController(void* args) {
 	bool openTimerRunning = false;
 	bool closeTimerRunning = false;
 
-	std::cout << "Controller running..." << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "Controller running..." << std::endl;
 
 	char message[512];
 	int rcvid;
 
 	while(1){
 		// check for message
-		std::cout << "Now waiting in controller for a message" << std::endl;
+		if (DEBUG_MODE)
+			std::cout << "Now waiting in controller for a message" << std::endl;
 		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
-		std::cout << "GOT message in controller " << message << std::endl;
+		if (DEBUG_MODE)
+			std::cout << "GOT message in controller " << message << std::endl;
 
 		// get the event
 		Controller::Events e = CharToEvent(message[0]);
@@ -224,6 +234,18 @@ void *RunController(void* args) {
 		// send a response
 		strcpy(message, "Sending response");
 		MsgReply(rcvid, 1, message, sizeof(message));
+
+		// check for timers, kill any that are running if required
+		// if either timer is running, kill it
+		if(openTimerRunning && e != Controller::DOOR_OPENED){
+			pthread_cancel(doorOpeningTimerThread);
+			openTimerRunning = false;
+		}
+
+		if(closeTimerRunning && e != Controller::DOOR_CLOSED) {
+			pthread_cancel(doorClosingTimerThread);
+			closeTimerRunning = false;
+		}
 
 		switch(e) {
 		case Controller::SHUTDOWN:
@@ -248,16 +270,6 @@ void *RunController(void* args) {
 			m1.HandleEvent(e);
 			break;
 		default:
-			// if either timer is running, kill it
-			if(openTimerRunning){
-				pthread_kill(doorOpeningTimerThread, 0);
-				openTimerRunning = false;
-			}
-
-			if(closeTimerRunning) {
-				pthread_kill(doorClosingTimerThread, 0);
-				closeTimerRunning = false;
-			}
 			m1.HandleEvent(e);
 			break;
 		}
@@ -267,7 +279,8 @@ void *RunController(void* args) {
 }
 
 void *RunHardwareFacade(void* args) {
-	std::cout << "Hardware facade running..." << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "Hardware facade running..." << std::endl;
 
 	Channels* chids = (Channels*)args;
 	int sendChid = chids->inputScannerChid;
@@ -288,7 +301,8 @@ void *RunHardwareFacade(void* args) {
 	while(1){
 		// check for message
 		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
-		std::cout << "GOT message in hardware facade " << message << std::endl;
+		if (DEBUG_MODE)
+			std::cout << "GOT message in hardware facade " << message << std::endl;
 
 		// send a response to wherever the message originally came from
 		std::string response =  "Sending response";
@@ -305,7 +319,8 @@ void *RunHardwareFacade(void* args) {
 
 int main(int argc, char *argv[]) {
 
-	std::cout << "Main running... " << std::endl;
+	if (DEBUG_MODE)
+		std::cout << "Main running... " << std::endl;
 
 	pthread_t inputScannerThread;
 	pthread_t controllerThread;
@@ -326,6 +341,7 @@ int main(int argc, char *argv[]) {
 	pthread_join(inputScannerThread, NULL);
 	pthread_join(controllerThread, NULL);
 	pthread_join(hardwareFacadeThread, NULL);
+	pthread_join(keyboardScannerThread, NULL);
 
 	return EXIT_SUCCESS;
 }

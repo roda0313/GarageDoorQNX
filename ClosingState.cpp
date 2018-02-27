@@ -12,8 +12,9 @@
 
 namespace Controller {
 
-ClosingState::ClosingState() {
+ClosingState::ClosingState(Machine *m) {
 	std::cout << "Creating ClosingState object" << std::endl;
+	m->SendEvent(EventToChar(MOTOR_REVERSE));
 }
 
 ClosingState::~ClosingState() {
@@ -34,13 +35,12 @@ void ClosingState::HandleEvent(Machine *m, Events e){
 	else if(e == IR_TRIP) {
 		// handle the event then change state
 		std::cout << "Got IR Trip event, moving to Opening state" << std::endl;
-		m->SetState(new OpeningState());
-		m->SendEvent(EventToChar(MOTOR_FORWARD));
+		m->SetState(new OpeningState(m));
 	}
 	else if(e == OVERCURRENT) {
 		// handle the event then change state
 		std::cout << "Got over current event, moving to Opening state" << std::endl;
-		m->SetState(new OpeningState());
+		m->SetState(new OpeningState(m));
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state ClosingState" << std::endl;

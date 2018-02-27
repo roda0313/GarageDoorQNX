@@ -11,8 +11,9 @@
 
 namespace Controller {
 
-OpeningState::OpeningState() {
+OpeningState::OpeningState(Machine *m) {
 	std::cout << "Creating OpeningState object" << std::endl;
+	m->SendEvent(EventToChar(MOTOR_FORWARD));
 }
 
 OpeningState::~OpeningState() {

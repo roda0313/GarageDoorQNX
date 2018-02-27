@@ -23,8 +23,7 @@ void ClosedState::HandleEvent(Machine *m, Events e){
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
 		std::cout << "Got push button event, moving to opening state" << std::endl;
-		m->SetState(new OpeningState());
-		m->SendEvent(EventToChar(MOTOR_FORWARD));
+		m->SetState(new OpeningState(m));
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state ClosedState" << std::endl;
