@@ -35,7 +35,7 @@ void ClosingState::HandleEvent(Machine *m, Events e){
 		// handle the event then change state
 		std::cout << "Got IR Trip event, moving to Opening state" << std::endl;
 		m->SetState(new OpeningState());
-		m->SendEvent('z');
+		m->SendEvent(EventToChar(MOTOR_FORWARD));
 	}
 	else if(e == OVERCURRENT) {
 		// handle the event then change state

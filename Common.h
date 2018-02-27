@@ -1,4 +1,10 @@
 
+#ifndef COMMON_H
+#define COMMON_H
+
+#include <sstream>
+#include <string>
+
 namespace Controller {
 	enum Events {
 		PUSH_BUTTON = 0,
@@ -7,10 +13,19 @@ namespace Controller {
 		DOOR_OPENED,
 		DOOR_CLOSED,
 		IR_ON,
-		MOTOR_FORWARD,
-		MOTOR_REVERSE,
+		MOTOR_FORWARD, // door opening
+		MOTOR_REVERSE, // door closing
 		SHUTDOWN,
-		START_OPEN_TIMER,
-		START_CLOSE_TIMER,
 	};
+
+	static char EventToChar(Events e){
+		int event = (int)e;
+
+		std::ostringstream stm ;
+		stm << event ;
+		std::string ret = stm.str() ;
+		return ret[0];
+	}
 }
+
+#endif // COMMON_H

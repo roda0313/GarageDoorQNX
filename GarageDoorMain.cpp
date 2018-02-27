@@ -17,21 +17,27 @@ struct Channels {
 Controller::Events CharToEvent(char input) {
 	switch(input) {
 	case 'r':
+	case '0':
 		return Controller::PUSH_BUTTON;
-	case 'm':
-		return Controller::OVERCURRENT;
 	case 'i':
+	case '1':
 		return Controller::IR_TRIP;
-	case 's':
-		return Controller::SHUTDOWN;
-	case 'z':
-		return Controller::START_OPEN_TIMER;
-	case 'y':
-		return Controller::START_CLOSE_TIMER;
-	case 'o':
+	case 'm':
+	case '2':
+		return Controller::OVERCURRENT;
+	case '3':
 		return Controller::DOOR_OPENED;
-	case 'c':
+	case '4':
 		return Controller::DOOR_CLOSED;
+	case '5':
+		return Controller::IR_ON;
+	case '6':
+		return Controller::MOTOR_FORWARD;
+	case '7':
+		return Controller::MOTOR_REVERSE;
+	case 's':
+	case '8':
+		return Controller::SHUTDOWN;
 	default:
 		return (Controller::Events)input;
 	}
@@ -56,7 +62,8 @@ void *RunDoorOpeningTimerThread(void* args) {
 
 	// send an event saying its done
 	// 9 = door closed event
-	if(MsgSend(coid, "o", strlen("o") + 1, rmsg, sizeof(rmsg)) == -1) {
+	char toSend = Controller::EventToChar(Controller::DOOR_OPENED);
+	if(MsgSend(coid, &toSend, strlen(&toSend) + 1, rmsg, sizeof(rmsg)) == -1) {
 		std::cout << "Could not send message :[ " << "3" << std::endl;
 	}
 
@@ -81,7 +88,8 @@ void *RunDoorClosingTimerThread(void* args) {
 
 	// send an event saying its done
 	// 4 = door closed event
-	if(MsgSend(coid, "c", strlen("c") + 1, rmsg, sizeof(rmsg)) == -1) {
+	char toSend = Controller::EventToChar(Controller::DOOR_CLOSED);
+	if(MsgSend(coid, &toSend, strlen(&toSend) + 1, rmsg, sizeof(rmsg)) == -1) {
 		std::cout << "Could not send message :[ " << "4" << std::endl;
 	}
 
@@ -221,12 +229,12 @@ void *RunController(void* args) {
 		case Controller::SHUTDOWN:
 			std::cout << "Shutting down controller..." << std::endl;
 			return EXIT_SUCCESS;
-		case Controller::START_OPEN_TIMER:
+		case Controller::MOTOR_FORWARD:
 			openTimerRunning = true;
 			std::cout << "Start open timer" << std::endl;
 			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)chids->hardwareFacadeChid );
 			break;
-		case Controller::START_CLOSE_TIMER:
+		case Controller::MOTOR_REVERSE:
 			closeTimerRunning = true;
 			std::cout << "Start close timer" << std::endl;
 			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)chids->hardwareFacadeChid );
