@@ -8,6 +8,12 @@
 
 #include "Machine.h"
 
+struct Channels {
+	int inputScannerChid;
+	int controllerChid;
+	int hardwareFacadeChid;
+};
+
 Controller::Events CharToEvent(char input) {
 	switch(input) {
 	case 'r':
@@ -18,6 +24,14 @@ Controller::Events CharToEvent(char input) {
 		return Controller::IR_TRIP;
 	case 's':
 		return Controller::SHUTDOWN;
+	case 'z':
+		return Controller::START_OPEN_TIMER;
+	case 'y':
+		return Controller::START_CLOSE_TIMER;
+	case 'o':
+		return Controller::DOOR_OPENED;
+	case 'c':
+		return Controller::DOOR_CLOSED;
 	default:
 		return (Controller::Events)input;
 	}
@@ -42,7 +56,7 @@ void *RunDoorOpeningTimerThread(void* args) {
 
 	// send an event saying its done
 	// 9 = door closed event
-	if(MsgSend(coid, "3", strlen("3") + 1, rmsg, sizeof(rmsg)) == -1) {
+	if(MsgSend(coid, "o", strlen("o") + 1, rmsg, sizeof(rmsg)) == -1) {
 		std::cout << "Could not send message :[ " << "3" << std::endl;
 	}
 
@@ -67,18 +81,18 @@ void *RunDoorClosingTimerThread(void* args) {
 
 	// send an event saying its done
 	// 4 = door closed event
-	if(MsgSend(coid, "4", strlen("4") + 1, rmsg, sizeof(rmsg)) == -1) {
+	if(MsgSend(coid, "c", strlen("c") + 1, rmsg, sizeof(rmsg)) == -1) {
 		std::cout << "Could not send message :[ " << "4" << std::endl;
 	}
 
 	return EXIT_SUCCESS;
 }
 
-void *RunInputScaner(void* args) {
+void *RunKeyboardScannerThread(void* args){
+	std::cout << "Keyboard Scanner running..." << std::endl;
 
-	std::cout << "Input Scanner running..." << std::endl;
-
-	int chid = (int)args;
+	Channels* chids = (Channels*)args;
+	int chid = chids->inputScannerChid;
 	int coid;
 	coid = ConnectAttach(0, getpid(), chid, 0, 0);
 	char rmsg[200];
@@ -134,9 +148,51 @@ void *RunInputScaner(void* args) {
 	return EXIT_SUCCESS;
 }
 
+void *RunInputScaner(void* args) {
+
+	std::cout << "Input Scanner running..." << std::endl;
+
+	Channels* chids = (Channels*)args;
+	int sendChid = chids->controllerChid;
+	int receiveChid = chids->inputScannerChid;
+
+	// connect to the channel we will send on
+	int coid;
+	coid = ConnectAttach(0, getpid(), sendChid, 0, 0);
+	char rmsg[200];
+	if (coid == -1) {
+		std::cout << "Couldn't Connect :(" << std::endl;
+		return 0;
+	}
+
+	char message[512];
+	int rcvid;
+
+	while(1){
+		// check for message
+		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
+		std::cout << "GOT message in input scanner " << message << std::endl;
+
+		// send a response to wherever the message originally came from
+		std::string response =  "Sending response";
+		MsgReply(rcvid, 1, &response, sizeof(response));
+
+		// forward to controller
+		if(MsgSend(coid, message, strlen(message) + 1, rmsg, sizeof(rmsg)) == -1) {
+			std::cout << "Could not send message :[ " << message << std::endl;
+		}
+	}
+
+	return EXIT_SUCCESS;
+
+}
+
 void *RunController(void* args) {
-	int chid = (int)args;
-	Controller::Machine m1 = Controller::Machine(chid);
+	Channels* chids = (Channels*)args;
+	int receiveChid = chids->controllerChid;
+	int sendChid = chids->hardwareFacadeChid;
+
+	Controller::Machine m1 = Controller::Machine(sendChid);
 
 	pthread_t doorOpeningTimerThread;
 	pthread_t doorClosingTimerThread;
@@ -150,7 +206,8 @@ void *RunController(void* args) {
 
 	while(1){
 		// check for message
-		rcvid = MsgReceive(chid, message, sizeof(message), NULL);
+		std::cout << "Now waiting in controller for a message" << std::endl;
+		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
 		std::cout << "GOT message in controller " << message << std::endl;
 
 		// get the event
@@ -167,12 +224,12 @@ void *RunController(void* args) {
 		case Controller::START_OPEN_TIMER:
 			openTimerRunning = true;
 			std::cout << "Start open timer" << std::endl;
-//			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)chid );
+			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)chids->hardwareFacadeChid );
 			break;
 		case Controller::START_CLOSE_TIMER:
 			closeTimerRunning = true;
 			std::cout << "Start close timer" << std::endl;
-//			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)chid );
+			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)chids->hardwareFacadeChid );
 			break;
 		case Controller::DOOR_OPENED:
 			openTimerRunning = false;
@@ -184,17 +241,54 @@ void *RunController(void* args) {
 			break;
 		default:
 			// if either timer is running, kill it
-//			if(openTimerRunning){
-//				pthread_kill(doorOpeningTimerThread, 0);
-//				openTimerRunning = false;
-//			}
-//
-//			if(closeTimerRunning) {
-//				pthread_kill(doorClosingTimerThread, 0);
-//				closeTimerRunning = false;
-//			}
+			if(openTimerRunning){
+				pthread_kill(doorOpeningTimerThread, 0);
+				openTimerRunning = false;
+			}
+
+			if(closeTimerRunning) {
+				pthread_kill(doorClosingTimerThread, 0);
+				closeTimerRunning = false;
+			}
 			m1.HandleEvent(e);
 			break;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
+void *RunHardwareFacade(void* args) {
+	std::cout << "Hardware facade running..." << std::endl;
+
+	Channels* chids = (Channels*)args;
+	int sendChid = chids->inputScannerChid;
+	int receiveChid = chids->hardwareFacadeChid;
+
+	// connect to the channel we will send on
+	int coid;
+	coid = ConnectAttach(0, getpid(), sendChid, 0, 0);
+	char rmsg[200];
+	if (coid == -1) {
+		std::cout << "Couldn't Connect :(" << std::endl;
+		return 0;
+	}
+
+	char message[512];
+	int rcvid;
+
+	while(1){
+		// check for message
+		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
+		std::cout << "GOT message in hardware facade " << message << std::endl;
+
+		// send a response to wherever the message originally came from
+		std::string response =  "Sending response";
+		MsgReply(rcvid, 1, &response, sizeof(response));
+
+		// forward to input scanner
+		if(MsgSend(coid, message, strlen(message) + 1, rmsg, sizeof(rmsg)) == -1) {
+			std::cout << "Could not send message :[ " << message << std::endl;
 		}
 	}
 
@@ -207,15 +301,23 @@ int main(int argc, char *argv[]) {
 
 	pthread_t inputScannerThread;
 	pthread_t controllerThread;
+	pthread_t hardwareFacadeThread;
+	pthread_t keyboardScannerThread;
 
-	int chid;
-	chid = ChannelCreate(0);
+	int inputScannerChid = ChannelCreate(0);
+	int controllerChid = ChannelCreate(0);
+	int facadeChid = ChannelCreate(0);
 
-	pthread_create( &inputScannerThread, NULL, &RunInputScaner, (void*)chid );
-	pthread_create( &controllerThread, NULL, &RunController, (void*)chid );
+	Channels channels = { inputScannerChid, controllerChid, facadeChid };
+
+	pthread_create( &inputScannerThread, NULL, &RunInputScaner, (void*)&channels );
+	pthread_create( &controllerThread, NULL, &RunController, (void*)&channels );
+	pthread_create( &hardwareFacadeThread, NULL, &RunHardwareFacade, (void*)&channels);
+	pthread_create( &keyboardScannerThread, NULL, &RunKeyboardScannerThread, (void*)&channels);
 
 	pthread_join(inputScannerThread, NULL);
 	pthread_join(controllerThread, NULL);
+	pthread_join(hardwareFacadeThread, NULL);
 
 	return EXIT_SUCCESS;
 }

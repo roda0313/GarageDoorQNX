@@ -26,10 +26,11 @@ class Machine
     }
 
     void HandleEvent(Events);
-    void SendEvent(Events);
+    void SendEvent(char);
 
   private:
     int m_chid;
+    int m_coid;
 };
 
 class State

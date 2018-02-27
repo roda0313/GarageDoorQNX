@@ -17,6 +17,12 @@ namespace Controller {
 Machine::Machine(int chid) {
 	current = new ClosedState();
 	m_chid = chid;
+
+	m_coid = ConnectAttach(0, getpid(), m_chid, 0, 0);
+	if (m_coid == -1) {
+		std::cout << "Couldn't Connect :(" << std::endl;
+		return;
+	}
 }
 
 Machine::~Machine() {
@@ -27,26 +33,13 @@ void Machine::HandleEvent(Events e) {
 	current->HandleEvent(this, e);
 }
 
-void Machine::SendEvent(Events e) {
+void Machine::SendEvent(char e) {
 
-	int coid;
-	coid = ConnectAttach(0, getpid(), m_chid, 0, 0);
+	std::cout << "Attempting to send event from Machine: " << e << std::endl;
+
 	char rmsg[200];
-	if (coid == -1) {
-		std::cout << "Couldn't Connect :(" << std::endl;
-		return;
-	}
-
-	// convert event to string
-	std::stringstream strs;
-	strs << (int)e;
-	std::string temp_str = strs.str();
-	char const* pchar = temp_str.c_str();
-
-	std::cout << "Attempting to send event from Machine: " << pchar << std::endl;
-
-	if(MsgSend(coid, pchar, strlen(pchar) + 1, rmsg, sizeof(rmsg)) == -1) {
-		std::cout << "Could not send message :[ " << pchar << std::endl;
+	if(MsgSend(m_coid, &e, strlen(&e) + 1, rmsg, sizeof(rmsg)) == -1) {
+		std::cout << "Could not send message :[ " << e << std::endl;
 	}
 }
 
