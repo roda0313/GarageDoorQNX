@@ -5,6 +5,9 @@
 #include <sstream>
 #include <string>
 
+#define IO_PORT_SIZE 1
+#define CTRL_ADDRESS 0x37A
+
 namespace Controller {
 	const bool DEBUG_MODE = false;
 

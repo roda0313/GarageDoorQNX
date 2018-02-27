@@ -6,6 +6,9 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <stdint.h>
+#include <sys/mman.h>
+
 #include "Machine.h"
 
 const bool DEBUG_MODE = Controller::DEBUG_MODE;
@@ -152,6 +155,7 @@ void *RunKeyboardScannerThread(void* args){
 			if(MsgSend(coid, &inp, strlen(&inp) + 1, rmsg, sizeof(rmsg)) == -1) {
 				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
+			std::cout << "Shutting down keyboard scanner..." << std::endl;
 			return EXIT_SUCCESS;
 		}
 		default:
@@ -196,6 +200,11 @@ void *RunInputScaner(void* args) {
 		if(MsgSend(coid, message, strlen(message) + 1, rmsg, sizeof(rmsg)) == -1) {
 			std::cout << "Could not send message :[ " << message << std::endl;
 		}
+
+		if(CharToEvent(message[0]) == Controller::SHUTDOWN){
+			std::cout <<"Shutting down input scanner..." << std::endl;
+			break;
+		}
 	}
 
 	return EXIT_SUCCESS;
@@ -237,12 +246,12 @@ void *RunController(void* args) {
 
 		// check for timers, kill any that are running if required
 		// if either timer is running, kill it
-		if(openTimerRunning && e != Controller::DOOR_OPENED){
+		if((openTimerRunning && e != Controller::DOOR_OPENED) || e == Controller::SHUTDOWN){
 			pthread_cancel(doorOpeningTimerThread);
 			openTimerRunning = false;
 		}
 
-		if(closeTimerRunning && e != Controller::DOOR_CLOSED) {
+		if((closeTimerRunning && e != Controller::DOOR_CLOSED) || e == Controller::SHUTDOWN) {
 			pthread_cancel(doorClosingTimerThread);
 			closeTimerRunning = false;
 		}
@@ -250,6 +259,8 @@ void *RunController(void* args) {
 		switch(e) {
 		case Controller::SHUTDOWN:
 			std::cout << "Shutting down controller..." << std::endl;
+			// make sure hardware facade gets shutdown signal
+			m1.SendEvent(EventToChar(Controller::SHUTDOWN));
 			return EXIT_SUCCESS;
 		case Controller::MOTOR_FORWARD:
 			openTimerRunning = true;
@@ -282,6 +293,12 @@ void *RunHardwareFacade(void* args) {
 	if (DEBUG_MODE)
 		std::cout << "Hardware facade running..." << std::endl;
 
+	uintptr_t ctrlHandle = mmap_device_io(IO_PORT_SIZE, CTRL_ADDRESS);
+	if(ctrlHandle == MAP_DEVICE_FAILED) {
+		std::perror("Failed to map control register");
+		return 0;
+	}
+
 	Channels* chids = (Channels*)args;
 	int sendChid = chids->inputScannerChid;
 	int receiveChid = chids->hardwareFacadeChid;
@@ -308,6 +325,12 @@ void *RunHardwareFacade(void* args) {
 		std::string response =  "Sending response";
 		MsgReply(rcvid, 1, &response, sizeof(response));
 
+		// the hardware facade is the last thing to shutdown so we dont need to send the message before closing
+		if(CharToEvent(message[0]) == Controller::SHUTDOWN){
+			std::cout <<"Shutting down hardware facade..." << std::endl;
+			break;
+		}
+
 		// forward to input scanner
 		if(MsgSend(coid, message, strlen(message) + 1, rmsg, sizeof(rmsg)) == -1) {
 			std::cout << "Could not send message :[ " << message << std::endl;
@@ -321,6 +344,12 @@ int main(int argc, char *argv[]) {
 
 	if (DEBUG_MODE)
 		std::cout << "Main running... " << std::endl;
+
+	if ( ThreadCtl(_NTO_TCTL_IO, NULL) == -1)
+	{
+		std::perror("Failed to get I/O access permission");
+		return 1;
+	}
 
 	pthread_t inputScannerThread;
 	pthread_t controllerThread;
