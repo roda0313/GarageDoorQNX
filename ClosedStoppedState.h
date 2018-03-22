@@ -14,7 +14,7 @@ namespace Controller {
 
 class ClosedStoppedState : public State {
 public:
-	ClosedStoppedState();
+	ClosedStoppedState(Machine *m);
 	virtual ~ClosedStoppedState();
 
 	void HandleEvent(Machine *m, Events e);

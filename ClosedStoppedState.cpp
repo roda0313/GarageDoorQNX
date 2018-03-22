@@ -10,8 +10,9 @@
 
 namespace Controller {
 
-ClosedStoppedState::ClosedStoppedState() {
+ClosedStoppedState::ClosedStoppedState(Machine *m) {
 	std::cout << "Creating ClosedStoppedState object" << std::endl;
+	m->SendEvent(EventToChar(STOP));
 }
 
 ClosedStoppedState::~ClosedStoppedState() {

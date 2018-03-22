@@ -25,7 +25,7 @@ void ClosingState::HandleEvent(Machine *m, Events e){
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
 		std::cout << "Got push button event, moving to ClosedStoppedState state" << std::endl;
-		m->SetState(new ClosedStoppedState());
+		m->SetState(new ClosedStoppedState(m));
 	}
 	else if(e == DOOR_CLOSED) {
 		// handle the event then change state

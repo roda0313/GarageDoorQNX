@@ -46,6 +46,8 @@ Controller::Events CharToEvent(char input) {
 	case 's':
 	case '8':
 		return Controller::SHUTDOWN;
+	case '9':
+		return Controller::STOP;
 	default:
 		return (Controller::Events)input;
 	}
@@ -174,12 +176,7 @@ void *RunHardwareScannerThread(void* args){
 		std::cout << "Hardware Scanner running..." << std::endl;
 
 	ThreadArgs* threadArgs = (ThreadArgs*)args;
-	uintptr_t portAHandle = threadArgs->portAHandle;
 	uintptr_t portBHandle = threadArgs->portBHandle;
-
-	// reset board to default state
-	out8(portAHandle, 0x00);
-	out8(portAHandle, PIN3);
 
 	int chid = threadArgs->inputScannerChid;
 	int coid;
@@ -190,52 +187,74 @@ void *RunHardwareScannerThread(void* args){
 		return 0;
 	}
 
+	bool doorClosed = true; // we always start with door closed
+	bool doorOpen = false;
+
 	while(1)
 	{
+		uint8_t prevReading;
 		uint8_t inp = in8(portBHandle);
-		if (DEBUG_MODE)
-			std::cout << "GOT " << static_cast<int>(inp) << std::endl;
 
-//		// motor up
-//		out8(portAHandle, (PIN0 | PIN3));
-//
-//		sleep(11);
-//
-//		out8(portAHandle, (0x00 | PIN3));
-
-		// full open
-		if((inp & PIN0) == PIN0) {
-			char message = EventToChar(Controller::DOOR_OPENED); // ? whatever this is
-			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
-				std::cout << "Could not send message :[ " << inp << std::endl;
-			}
+		// don't send events and do stuff unless the event has changed since we last checked
+		if (static_cast<int>(prevReading) == static_cast<int>(inp)) {
+			usleep(400);
+			continue;
 		}
-		// full closed
-		else if((inp & PIN1) == PIN1) {
-			char message = EventToChar(Controller::DOOR_CLOSED); // ? whatever this is
+		else {
+			prevReading = inp;
+		}
+
+		if (DEBUG_MODE) {
+			std::cout << "GOT in hardware scanner " << static_cast<int>(inp) << std::endl;
+		}
+
+		// these events are ordered by importance and which events take precedence
+		// Push button
+		if((inp & PIN4) == PIN4) {
+			char message = EventToChar(Controller::PUSH_BUTTON);
 			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
 				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
 		}
 		// IR Break
 		else if((inp & PIN2) == PIN2) {
-			char message = EventToChar(Controller::IR_TRIP); // ? whatever this is
+			char message = EventToChar(Controller::IR_TRIP);
 			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
 				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
 		}
 		// Over current
 		else if((inp & PIN3) == PIN3) {
-			char message = EventToChar(Controller::OVERCURRENT); // ? whatever this is
+			char message = EventToChar(Controller::OVERCURRENT);
 			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
 				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
 		}
-		// Push button
-		else if((inp & PIN4) == PIN4) {
-			char message = EventToChar(Controller::PUSH_BUTTON); // ? whatever this is
-			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
-				std::cout << "Could not send message :[ " << inp << std::endl;
+		// full open
+		else if((inp & PIN0) == PIN0) {
+			// only send this event if the door was not already open
+			// ie. dont send event twice
+			if(!doorOpen) {
+				char message = EventToChar(Controller::DOOR_OPENED);
+				if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+					std::cout << "Could not send message :[ " << inp << std::endl;
+				}
+
+				doorOpen = true;
+				doorClosed = false;
+			}
+		}
+		// full closed
+		else if((inp & PIN1) == PIN1) {
+			// dont send door closed event more than once
+			if(!doorClosed) {
+				char message = EventToChar(Controller::DOOR_CLOSED);
+				if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+					std::cout << "Could not send message :[ " << inp << std::endl;
+				}
+
+				doorClosed = true;
+				doorOpen = false;
 			}
 		}
 		// unused
@@ -257,7 +276,7 @@ void *RunHardwareScannerThread(void* args){
 			std::cout << "Invalid input " << static_cast<int>(inp) << std::endl;
 		}
 
-		usleep(900);
+		usleep(400);
 	}
 
 	return EXIT_SUCCESS;
@@ -287,7 +306,7 @@ void *RunInputScanner(void* args) {
 		// check for message
 		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
 		if (DEBUG_MODE)
-			std::cout << "GOT message in input scanner " << message << std::endl;
+			std::cout << "GOT message in input scanner " << message[0] << std::endl;
 
 		// send a response to wherever the message originally came from
 		std::string response =  "Sending response";
@@ -310,8 +329,10 @@ void *RunInputScanner(void* args) {
 
 void *RunController(void* args) {
 	ThreadArgs* threadArgs = (ThreadArgs*)args;
+
 	int receiveChid = threadArgs->controllerChid;
 	int sendChid = threadArgs->hardwareFacadeChid;
+	uintptr_t portAHandle = threadArgs->portAHandle;
 
 	Controller::Machine m1 = Controller::Machine(sendChid);
 
@@ -332,7 +353,7 @@ void *RunController(void* args) {
 			std::cout << "Now waiting in controller for a message" << std::endl;
 		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
 		if (DEBUG_MODE)
-			std::cout << "GOT message in controller " << message << std::endl;
+			std::cout << "GOT message in controller " << message[0] << std::endl;
 
 		// get the event
 		Controller::Events e = CharToEvent(message[0]);
@@ -360,28 +381,79 @@ void *RunController(void* args) {
 			m1.SendEvent(EventToChar(Controller::SHUTDOWN));
 			return EXIT_SUCCESS;
 		case Controller::MOTOR_FORWARD:
+		{
 //			openTimerRunning = true;
 //			std::cout << "Start open timer" << std::endl;
 //			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)threadArgs->hardwareFacadeChid );
 			// send motor forward to hardware
+			uint8_t toSend = PIN0 | PIN3;
+
+			if (DEBUG_MODE)
+				std::cout << "Now sending to FPGA: " << static_cast<int>(toSend) << std::endl;
+
+			out8(portAHandle, toSend);
 			break;
+		}
 		case Controller::MOTOR_REVERSE:
+		{
 //			closeTimerRunning = true;
 //			std::cout << "Start close timer" << std::endl;
 //			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)threadArgs->hardwareFacadeChid );
 			// send motor reverse to hardware
+			// PIN1 = motor reverse
+			// PIN2 = IR_ON
+			// PIN3 = reset
+			uint8_t toSend = PIN1 | PIN2 | PIN3;
+
+			if (DEBUG_MODE)
+				std::cout << "Now sending to FPGA: " << static_cast<int>(toSend) << std::endl;
+
+			out8(portAHandle, toSend);
 			break;
+		}
 		case Controller::DOOR_OPENED:
+		{
 //			openTimerRunning = false;
 			m1.HandleEvent(e);
+
+			uint8_t toSend = PIN3;
+
+			if (DEBUG_MODE)
+				std::cout << "Now sending to FPGA: " << static_cast<int>(toSend) << std::endl;
+
+			out8(portAHandle, toSend);
 			break;
+		}
 		case Controller::DOOR_CLOSED:
+		{
 //			closeTimerRunning = false;
 			m1.HandleEvent(e);
+
+			uint8_t toSend = PIN3;
+
+			if (DEBUG_MODE)
+				std::cout << "Now sending to FPGA: " << static_cast<int>(toSend) << std::endl;
+
+			out8(portAHandle, toSend);
 			break;
+		}
+		case Controller::STOP:
+		{
+			uint8_t toSend = PIN3;
+
+			if (DEBUG_MODE)
+				std::cout << "Now sending to FPGA: " << static_cast<int>(toSend) << std::endl;
+
+			out8(portAHandle, toSend);
+			break;
+		}
 		default:
+		{
+			if (DEBUG_MODE)
+				std::cout << "Sending event to state machine, e=" << EventToChar(e) << std::endl;
 			m1.HandleEvent(e);
 			break;
+		}
 		}
 	}
 
@@ -412,7 +484,7 @@ void *RunHardwareFacade(void* args) {
 		// check for message
 		rcvid = MsgReceive(receiveChid, message, sizeof(message), NULL);
 		if (DEBUG_MODE)
-			std::cout << "GOT message in hardware facade " << message << std::endl;
+			std::cout << "GOT message in hardware facade " << message[0] << std::endl;
 
 		// send a response to wherever the message originally came from
 		std::string response =  "Sending response";
@@ -467,6 +539,10 @@ int main(int argc, char *argv[]) {
 		std::perror("Failed to map portB register");
 		return 0;
 	}
+
+	// reset board to default state
+	out8(portAHandle, 0x00);
+	out8(portAHandle, PIN3);
 
 	pthread_t inputScannerThread;
 	pthread_t controllerThread;

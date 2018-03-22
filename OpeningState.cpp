@@ -24,7 +24,7 @@ void OpeningState::HandleEvent(Machine *m, Events e){
 	if(e == PUSH_BUTTON) {
 		// handle the event then change state
 		std::cout << "Got push button event, moving to OpenStopped state" << std::endl;
-		m->SetState(new OpenStoppedState());
+		m->SetState(new OpenStoppedState(m));
 	}
 	else if(e == DOOR_OPENED) {
 		// handle the event then change state
@@ -34,11 +34,11 @@ void OpeningState::HandleEvent(Machine *m, Events e){
 	else if(e == OVERCURRENT) {
 		// handle the event then change state
 		std::cout << "Got over current event, moving to OpenStoppedState state" << std::endl;
-		m->SetState(new OpenStoppedState());
+		m->SetState(new OpenStoppedState(m));
 	}
 	else {
 		std::cout << "Unhandled event " << e << " in state OpeningState" << std::endl;
-		return; // dont destroy object, stay in state
+		return; // don't destroy object, stay in state
 	}
 
 	delete this;

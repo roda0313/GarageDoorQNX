@@ -11,8 +11,9 @@
 
 namespace Controller {
 
-OpenStoppedState::OpenStoppedState() {
+OpenStoppedState::OpenStoppedState(Machine *m) {
 	std::cout << "Creating OpenStoppedState object" << std::endl;
+	m->SendEvent(EventToChar(STOP));
 }
 
 OpenStoppedState::~OpenStoppedState() {

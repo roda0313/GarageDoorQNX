@@ -33,6 +33,7 @@ namespace Controller {
 		MOTOR_FORWARD, // door opening
 		MOTOR_REVERSE, // door closing
 		SHUTDOWN,
+		STOP
 	};
 
 	static char EventToChar(Events e){
