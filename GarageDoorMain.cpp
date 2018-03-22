@@ -203,32 +203,55 @@ void *RunHardwareScannerThread(void* args){
 //
 //		out8(portAHandle, (0x00 | PIN3));
 
+		// full open
 		if((inp & PIN0) == PIN0) {
-			char message = EventToChar(Controller::SHUTDOWN); // ? whatever this is
+			char message = EventToChar(Controller::DOOR_OPENED); // ? whatever this is
 			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
 				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
 		}
+		// full closed
 		else if((inp & PIN1) == PIN1) {
-
+			char message = EventToChar(Controller::DOOR_CLOSED); // ? whatever this is
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
+			}
 		}
+		// IR Break
 		else if((inp & PIN2) == PIN2) {
-
+			char message = EventToChar(Controller::IR_TRIP); // ? whatever this is
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
+			}
 		}
+		// Over current
 		else if((inp & PIN3) == PIN3) {
-
+			char message = EventToChar(Controller::OVERCURRENT); // ? whatever this is
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
+			}
 		}
+		// Push button
 		else if((inp & PIN4) == PIN4) {
-
+			char message = EventToChar(Controller::PUSH_BUTTON); // ? whatever this is
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
+			}
 		}
+		// unused
 		else if((inp & PIN5) == PIN5) {
-
+			if (DEBUG_MODE)
+				std::cout << "Unused pin " << static_cast<int>(inp) << std::endl;
 		}
+		// unused
 		else if((inp & PIN6) == PIN6) {
-
+			if (DEBUG_MODE)
+				std::cout << "Unused pin " << static_cast<int>(inp) << std::endl;
 		}
+		// unused
 		else if((inp & PIN7) == PIN7) {
-
+			if (DEBUG_MODE)
+				std::cout << "Unused pin " << static_cast<int>(inp) << std::endl;
 		}
 		else {
 			std::cout << "Invalid input " << static_cast<int>(inp) << std::endl;
@@ -240,7 +263,7 @@ void *RunHardwareScannerThread(void* args){
 	return EXIT_SUCCESS;
 }
 
-void *RunInputScaner(void* args) {
+void *RunInputScanner(void* args) {
 	if (DEBUG_MODE)
 		std::cout << "Input Scanner running..." << std::endl;
 
@@ -292,10 +315,10 @@ void *RunController(void* args) {
 
 	Controller::Machine m1 = Controller::Machine(sendChid);
 
-	pthread_t doorOpeningTimerThread;
-	pthread_t doorClosingTimerThread;
-	bool openTimerRunning = false;
-	bool closeTimerRunning = false;
+//	pthread_t doorOpeningTimerThread;
+//	pthread_t doorClosingTimerThread;
+//	bool openTimerRunning = false;
+//	bool closeTimerRunning = false;
 
 	if (DEBUG_MODE)
 		std::cout << "Controller running..." << std::endl;
@@ -320,15 +343,15 @@ void *RunController(void* args) {
 
 		// check for timers, kill any that are running if required
 		// if either timer is running, kill it
-		if((openTimerRunning && e != Controller::DOOR_OPENED) || e == Controller::SHUTDOWN){
-			pthread_cancel(doorOpeningTimerThread);
-			openTimerRunning = false;
-		}
-
-		if((closeTimerRunning && e != Controller::DOOR_CLOSED) || e == Controller::SHUTDOWN) {
-			pthread_cancel(doorClosingTimerThread);
-			closeTimerRunning = false;
-		}
+//		if((openTimerRunning && e != Controller::DOOR_OPENED) || e == Controller::SHUTDOWN){
+//			pthread_cancel(doorOpeningTimerThread);
+//			openTimerRunning = false;
+//		}
+//
+//		if((closeTimerRunning && e != Controller::DOOR_CLOSED) || e == Controller::SHUTDOWN) {
+//			pthread_cancel(doorClosingTimerThread);
+//			closeTimerRunning = false;
+//		}
 
 		switch(e) {
 		case Controller::SHUTDOWN:
@@ -337,21 +360,23 @@ void *RunController(void* args) {
 			m1.SendEvent(EventToChar(Controller::SHUTDOWN));
 			return EXIT_SUCCESS;
 		case Controller::MOTOR_FORWARD:
-			openTimerRunning = true;
-			std::cout << "Start open timer" << std::endl;
-			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)threadArgs->hardwareFacadeChid );
+//			openTimerRunning = true;
+//			std::cout << "Start open timer" << std::endl;
+//			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)threadArgs->hardwareFacadeChid );
+			// send motor forward to hardware
 			break;
 		case Controller::MOTOR_REVERSE:
-			closeTimerRunning = true;
-			std::cout << "Start close timer" << std::endl;
-			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)threadArgs->hardwareFacadeChid );
+//			closeTimerRunning = true;
+//			std::cout << "Start close timer" << std::endl;
+//			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)threadArgs->hardwareFacadeChid );
+			// send motor reverse to hardware
 			break;
 		case Controller::DOOR_OPENED:
-			openTimerRunning = false;
+//			openTimerRunning = false;
 			m1.HandleEvent(e);
 			break;
 		case Controller::DOOR_CLOSED:
-			closeTimerRunning = false;
+//			closeTimerRunning = false;
 			m1.HandleEvent(e);
 			break;
 		default:
@@ -432,14 +457,14 @@ int main(int argc, char *argv[]) {
 	// outputs from the controller to the FPGA
 	uintptr_t portAHandle = mmap_device_io(IO_PORT_SIZE, PORTA);
 	if(portAHandle == MAP_DEVICE_FAILED) {
-		std::perror("Failed to map control register");
+		std::perror("Failed to map portA register");
 		return 0;
 	}
 
 	// input to the controller (purple box)
 	uintptr_t portBHandle = mmap_device_io(IO_PORT_SIZE, PORTB);
 	if(portBHandle == MAP_DEVICE_FAILED) {
-		std::perror("Failed to map control register");
+		std::perror("Failed to map portB register");
 		return 0;
 	}
 
@@ -455,7 +480,7 @@ int main(int argc, char *argv[]) {
 
 	ThreadArgs args = { inputScannerChid, controllerChid, facadeChid, portAHandle, portBHandle };
 
-	pthread_create( &inputScannerThread, NULL, &RunInputScaner, (void*)&args );
+	pthread_create( &inputScannerThread, NULL, &RunInputScanner, (void*)&args );
 	pthread_create( &controllerThread, NULL, &RunController, (void*)&args );
 	pthread_create( &hardwareFacadeThread, NULL, &RunHardwareFacade, (void*)&args);
 //	pthread_create( &keyboardScannerThread, NULL, &RunKeyboardScannerThread, (void*)&args);
