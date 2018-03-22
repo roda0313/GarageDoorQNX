@@ -232,29 +232,16 @@ void *RunHardwareScannerThread(void* args){
 		}
 		// full open
 		else if((inp & PIN0) == PIN0) {
-			// only send this event if the door was not already open
-			// ie. dont send event twice
-			if(!doorOpen) {
-				char message = EventToChar(Controller::DOOR_OPENED);
-				if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
-					std::cout << "Could not send message :[ " << inp << std::endl;
-				}
-
-				doorOpen = true;
-				doorClosed = false;
+			char message = EventToChar(Controller::DOOR_OPENED);
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
 		}
 		// full closed
 		else if((inp & PIN1) == PIN1) {
-			// dont send door closed event more than once
-			if(!doorClosed) {
-				char message = EventToChar(Controller::DOOR_CLOSED);
-				if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
-					std::cout << "Could not send message :[ " << inp << std::endl;
-				}
-
-				doorClosed = true;
-				doorOpen = false;
+			char message = EventToChar(Controller::DOOR_CLOSED);
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
 			}
 		}
 		// unused
@@ -276,7 +263,7 @@ void *RunHardwareScannerThread(void* args){
 			std::cout << "Invalid input " << static_cast<int>(inp) << std::endl;
 		}
 
-		usleep(400);
+		usleep(800000); // 0.8 seconds
 	}
 
 	return EXIT_SUCCESS;
