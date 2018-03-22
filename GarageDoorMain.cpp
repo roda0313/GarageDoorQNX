@@ -5,6 +5,7 @@
 #include <sys/netmgr.h>
 #include <unistd.h>
 #include <string.h>
+#include <hw/inout.h>
 
 #include <stdint.h>
 #include <sys/mman.h>
@@ -13,10 +14,12 @@
 
 const bool DEBUG_MODE = Controller::DEBUG_MODE;
 
-struct Channels {
+struct ThreadArgs {
 	int inputScannerChid;
 	int controllerChid;
 	int hardwareFacadeChid;
+	uintptr_t portAHandle;
+	uintptr_t portBHandle;
 };
 
 Controller::Events CharToEvent(char input) {
@@ -107,8 +110,8 @@ void *RunKeyboardScannerThread(void* args){
 	if (DEBUG_MODE)
 		std::cout << "Keyboard Scanner running..." << std::endl;
 
-	Channels* chids = (Channels*)args;
-	int chid = chids->inputScannerChid;
+	ThreadArgs* threadArgs = (ThreadArgs*)args;
+	int chid = threadArgs->inputScannerChid;
 	int coid;
 	coid = ConnectAttach(0, getpid(), chid, 0, 0);
 	char rmsg[200];
@@ -166,13 +169,84 @@ void *RunKeyboardScannerThread(void* args){
 	return EXIT_SUCCESS;
 }
 
+void *RunHardwareScannerThread(void* args){
+	if (DEBUG_MODE)
+		std::cout << "Hardware Scanner running..." << std::endl;
+
+	ThreadArgs* threadArgs = (ThreadArgs*)args;
+	uintptr_t portAHandle = threadArgs->portAHandle;
+	uintptr_t portBHandle = threadArgs->portBHandle;
+
+	// reset board to default state
+	out8(portAHandle, 0x00);
+	out8(portAHandle, PIN3);
+
+	int chid = threadArgs->inputScannerChid;
+	int coid;
+	coid = ConnectAttach(0, getpid(), chid, 0, 0);
+	char rmsg[200];
+	if (coid == -1) {
+		std::cout << "Couldn't Connect :(" << std::endl;
+		return 0;
+	}
+
+	while(1)
+	{
+		uint8_t inp = in8(portBHandle);
+		if (DEBUG_MODE)
+			std::cout << "GOT " << static_cast<int>(inp) << std::endl;
+
+//		// motor up
+//		out8(portAHandle, (PIN0 | PIN3));
+//
+//		sleep(11);
+//
+//		out8(portAHandle, (0x00 | PIN3));
+
+		if((inp & PIN0) == PIN0) {
+			char message = EventToChar(Controller::SHUTDOWN); // ? whatever this is
+			if(MsgSend(coid, &message, strlen(&message) + 1, rmsg, sizeof(rmsg)) == -1) {
+				std::cout << "Could not send message :[ " << inp << std::endl;
+			}
+		}
+		else if((inp & PIN1) == PIN1) {
+
+		}
+		else if((inp & PIN2) == PIN2) {
+
+		}
+		else if((inp & PIN3) == PIN3) {
+
+		}
+		else if((inp & PIN4) == PIN4) {
+
+		}
+		else if((inp & PIN5) == PIN5) {
+
+		}
+		else if((inp & PIN6) == PIN6) {
+
+		}
+		else if((inp & PIN7) == PIN7) {
+
+		}
+		else {
+			std::cout << "Invalid input " << static_cast<int>(inp) << std::endl;
+		}
+
+		usleep(900);
+	}
+
+	return EXIT_SUCCESS;
+}
+
 void *RunInputScaner(void* args) {
 	if (DEBUG_MODE)
 		std::cout << "Input Scanner running..." << std::endl;
 
-	Channels* chids = (Channels*)args;
-	int sendChid = chids->controllerChid;
-	int receiveChid = chids->inputScannerChid;
+	ThreadArgs* threadArgs = (ThreadArgs*)args;
+	int sendChid = threadArgs->controllerChid;
+	int receiveChid = threadArgs->inputScannerChid;
 
 	// connect to the channel we will send on
 	int coid;
@@ -212,9 +286,9 @@ void *RunInputScaner(void* args) {
 }
 
 void *RunController(void* args) {
-	Channels* chids = (Channels*)args;
-	int receiveChid = chids->controllerChid;
-	int sendChid = chids->hardwareFacadeChid;
+	ThreadArgs* threadArgs = (ThreadArgs*)args;
+	int receiveChid = threadArgs->controllerChid;
+	int sendChid = threadArgs->hardwareFacadeChid;
 
 	Controller::Machine m1 = Controller::Machine(sendChid);
 
@@ -265,12 +339,12 @@ void *RunController(void* args) {
 		case Controller::MOTOR_FORWARD:
 			openTimerRunning = true;
 			std::cout << "Start open timer" << std::endl;
-			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)chids->hardwareFacadeChid );
+			pthread_create( &doorOpeningTimerThread, NULL, &RunDoorOpeningTimerThread, (void*)threadArgs->hardwareFacadeChid );
 			break;
 		case Controller::MOTOR_REVERSE:
 			closeTimerRunning = true;
 			std::cout << "Start close timer" << std::endl;
-			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)chids->hardwareFacadeChid );
+			pthread_create( &doorClosingTimerThread, NULL, &RunDoorClosingTimerThread, (void*)threadArgs->hardwareFacadeChid );
 			break;
 		case Controller::DOOR_OPENED:
 			openTimerRunning = false;
@@ -293,15 +367,9 @@ void *RunHardwareFacade(void* args) {
 	if (DEBUG_MODE)
 		std::cout << "Hardware facade running..." << std::endl;
 
-	uintptr_t ctrlHandle = mmap_device_io(IO_PORT_SIZE, CTRL_ADDRESS);
-	if(ctrlHandle == MAP_DEVICE_FAILED) {
-		std::perror("Failed to map control register");
-		return 0;
-	}
-
-	Channels* chids = (Channels*)args;
-	int sendChid = chids->inputScannerChid;
-	int receiveChid = chids->hardwareFacadeChid;
+	ThreadArgs* threadArgs = (ThreadArgs*)args;
+	int sendChid = threadArgs->inputScannerChid;
+	int receiveChid = threadArgs->hardwareFacadeChid;
 
 	// connect to the channel we will send on
 	int coid;
@@ -351,26 +419,53 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	// use port 0x28B (base + 11 offset) to set if port a/b is in or out
+	uintptr_t ctrlHandle = mmap_device_io(IO_PORT_SIZE, READ_WRITE_ADDRESS);
+	if(ctrlHandle == MAP_DEVICE_FAILED) {
+		std::perror("Failed to map control register");
+		return 0;
+	}
+
+	// set direction of ports in/out
+	out8(ctrlHandle, PIN1);
+
+	// outputs from the controller to the FPGA
+	uintptr_t portAHandle = mmap_device_io(IO_PORT_SIZE, PORTA);
+	if(portAHandle == MAP_DEVICE_FAILED) {
+		std::perror("Failed to map control register");
+		return 0;
+	}
+
+	// input to the controller (purple box)
+	uintptr_t portBHandle = mmap_device_io(IO_PORT_SIZE, PORTB);
+	if(portBHandle == MAP_DEVICE_FAILED) {
+		std::perror("Failed to map control register");
+		return 0;
+	}
+
 	pthread_t inputScannerThread;
 	pthread_t controllerThread;
 	pthread_t hardwareFacadeThread;
-	pthread_t keyboardScannerThread;
+//	pthread_t keyboardScannerThread;
+	pthread_t hardwareScannerThread;
 
 	int inputScannerChid = ChannelCreate(0);
 	int controllerChid = ChannelCreate(0);
 	int facadeChid = ChannelCreate(0);
 
-	Channels channels = { inputScannerChid, controllerChid, facadeChid };
+	ThreadArgs args = { inputScannerChid, controllerChid, facadeChid, portAHandle, portBHandle };
 
-	pthread_create( &inputScannerThread, NULL, &RunInputScaner, (void*)&channels );
-	pthread_create( &controllerThread, NULL, &RunController, (void*)&channels );
-	pthread_create( &hardwareFacadeThread, NULL, &RunHardwareFacade, (void*)&channels);
-	pthread_create( &keyboardScannerThread, NULL, &RunKeyboardScannerThread, (void*)&channels);
+	pthread_create( &inputScannerThread, NULL, &RunInputScaner, (void*)&args );
+	pthread_create( &controllerThread, NULL, &RunController, (void*)&args );
+	pthread_create( &hardwareFacadeThread, NULL, &RunHardwareFacade, (void*)&args);
+//	pthread_create( &keyboardScannerThread, NULL, &RunKeyboardScannerThread, (void*)&args);
+	pthread_create( &hardwareScannerThread, NULL, &RunHardwareScannerThread, (void*)&args);
 
 	pthread_join(inputScannerThread, NULL);
 	pthread_join(controllerThread, NULL);
 	pthread_join(hardwareFacadeThread, NULL);
-	pthread_join(keyboardScannerThread, NULL);
+//	pthread_join(keyboardScannerThread, NULL);
+	pthread_join(hardwareScannerThread, NULL);
 
 	return EXIT_SUCCESS;
 }

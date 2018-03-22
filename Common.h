@@ -6,10 +6,22 @@
 #include <string>
 
 #define IO_PORT_SIZE 1
-#define CTRL_ADDRESS 0x37A
+#define BASE 0x280
+#define PORTA BASE+0x08
+#define PORTB BASE+0x09
+#define READ_WRITE_ADDRESS 0x28B
+
+#define PIN0 0x01
+#define PIN1 0x02
+#define PIN2 0x04
+#define PIN3 0x08
+#define PIN4 0x10
+#define PIN5 0x20
+#define PIN6 0x40
+#define PIN7 0x80
 
 namespace Controller {
-	const bool DEBUG_MODE = false;
+	const bool DEBUG_MODE = true;
 
 	enum Events {
 		PUSH_BUTTON = 0,
