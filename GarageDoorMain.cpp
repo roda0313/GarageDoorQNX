@@ -187,9 +187,6 @@ void *RunHardwareScannerThread(void* args){
 		return 0;
 	}
 
-	bool doorClosed = true; // we always start with door closed
-	bool doorOpen = false;
-
 	while(1)
 	{
 		uint8_t prevReading;
@@ -263,7 +260,7 @@ void *RunHardwareScannerThread(void* args){
 			std::cout << "Invalid input " << static_cast<int>(inp) << std::endl;
 		}
 
-		usleep(800000); // 0.8 seconds
+		sleep(1);
 	}
 
 	return EXIT_SUCCESS;
