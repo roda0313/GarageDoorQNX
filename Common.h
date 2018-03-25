@@ -21,7 +21,7 @@
 #define PIN7 0x80
 
 namespace Controller {
-	const bool DEBUG_MODE = true;
+	const bool DEBUG_MODE = false;
 
 	enum Events {
 		PUSH_BUTTON = 0,
